@@ -1,36 +1,36 @@
 import simpy
-import pandas 
-import matplotlib
+import itertools
 import random
-#developing the ability to model the function of the colon cancer screening centre
-
-#To do:
-#Develop the functions to: assign probability, define each resource, define each outcome, determine what I want to 
-# measure and report
+import statistics
 
 
-#median +/- 1 - should be 0.68/3, down to bottom would be rest of -1 to -3. Positive from median to end of list - x4 would 4, 2 would be 3, 1.5 would be 2
-# and median to end of list would be +1
-# bottom_range to median should 2 sigma, median to top should be 4 sigma. 
 
-# random.choices(population, weights=None, *, k=1)
-#print(random.choices(numberList, weights=(10, 20, 30, 40, 50), k=5))
+class CCSC(object):
+    def __init__(self, env, num_beds):
+        self.env = env
+        self.bed = simpy.Resource(env, 4)
 
-def scope_time_multiplier (bottom_range, top_range):
-    times = list(range(bottom_range, top_range + 1))
+    def colonoscopy(self, patient):
+        yield self.env.timeout(random.randint(30,75))
 
-    times2 = times + [int(top_range *1.5), int(top_range *2), int(top_range *4)]
-    median_index = (len(times2)//2) -2
-    median_term = times2[median_index]
-    next_term = median_index + 1
-    previous_term = median_index - 1
+def have_a_scope(env, patient, ccsc):
+   with ccsc.bed.request() as request:
+        yield request
+        print(f'{patient} arrives at CCSC {env.now:.2f}.')
+        yield env.process(ccsc.colonoscopy(patient))
+        print(f'{patient} leaves CCSC {env.now:.2f}.')
 
-    Count_Below_Median = len(times2[:median_index])
-    Count_Above_Median = len(times2[median_index:])
-    
-    weights = [0.002,0.002,0.002,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.002,0.001]
-    time = random.choices(times2, weights = weights, k = 1)
-    return time
+def perform_scopes(env, num_beds):
+    c_csc = CCSC(env, num_beds)
+    patients = itertools.count()
 
-x = scope_time_multiplier(15,30)
-print(x)
+    for patient in range(1):
+        env.process(have_a_scope(env, f' patient {next(patients)}', c_csc))
+
+    while True:
+        yield env.timeout(30)
+        env.process(have_a_scope(env, f' patient {next(patients)}', c_csc))
+
+env = simpy.Environment()
+env.process(perform_scopes(env, 4))
+env.run(until=300)
